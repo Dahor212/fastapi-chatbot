@@ -3,4 +3,4 @@ uvicorn
 openai
 chromadb
 python-docx
-gunicorn
+requests
