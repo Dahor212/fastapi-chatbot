@@ -4,17 +4,33 @@ import chromadb
 from fastapi import FastAPI
 from openai import OpenAI
 from starlette.responses import JSONResponse
+from contextlib import asynccontextmanager
 
 # URL k souboru s embeddingy na GitHubu (RAW verze!)
 GITHUB_EMBEDDINGS_URL = "https://raw.githubusercontent.com/Dahor212/fastapi-chatbot/main/data/embeddings.json"
 
 # Inicializace FastAPI
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Kód, který se vykoná při startu aplikace
+    print("📥 Načítám embeddingy z GitHubu...")
+    embeddings = load_embeddings_from_github()
+
+    if embeddings:
+        collection.clear()
+        for doc_id, embedding in embeddings.items():
+            collection.add(ids=[doc_id], embeddings=[embedding])
+        print("✅ Embeddingy úspěšně uloženy do ChromaDB!")
+
+    yield
+    # Kód, který se vykoná při ukončení aplikace
+    print("Aplikace se ukončuje.")
+
+app = FastAPI(lifespan=lifespan)
 
 # Inicializace ChromaDB
 chroma_client = chromadb.PersistentClient(path="./chroma_db")
 collection = chroma_client.get_or_create_collection(name="documents")
-
 
 # Načtení embeddingů z GitHubu
 def load_embeddings_from_github():
@@ -27,19 +43,6 @@ def load_embeddings_from_github():
     except requests.exceptions.RequestException as e:
         print(f"❌ Chyba při načítání embeddingů z GitHubu: {e}")
         return None
-
-
-@app.on_event("startup")
-def startup_event():
-    print("📥 Načítám embeddingy z GitHubu...")
-    embeddings = load_embeddings_from_github()
-
-    if embeddings:
-        collection.clear()
-        for doc_id, embedding in embeddings.items():
-            collection.add(ids=[doc_id], embeddings=[embedding])
-        print("✅ Embeddingy úspěšně uloženy do ChromaDB!")
-
 
 @app.get("/chat")
 def chat(query: str):
