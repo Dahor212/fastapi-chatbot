@@ -1,5 +1,6 @@
 fastapi
 uvicorn
-chromadb
 openai
+chromadb
 python-docx
+gunicorn

@@ -21,7 +21,7 @@ openai.api_key = OPENAI_API_KEY
 # Inicializace FastAPI
 app = FastAPI()
 
-# Určení cesty pro ChromaDB (vytvoří složku, pokud neexistuje)
+# Určení cesty pro ChromaDB (Railway používá "/app" jako pracovní adresář)
 db_path = os.getenv("CHROMA_DB_PATH", "/app/chroma_db")
 os.makedirs(db_path, exist_ok=True)
 chroma_client = chromadb.PersistentClient(path=db_path)
@@ -41,25 +41,38 @@ def add_documents_to_chroma(file_path: str):
         logging.error(f"❌ Soubor {file_path} nebyl nalezen.")
         return
 
+    # Přidání souboru pouze pokud ještě není v databázi
     existing_docs = collection.count()
     logging.info(f"📊 ChromaDB obsahuje {existing_docs} dokumentů před načítáním.")
 
-    if existing_docs > 0:
-        logging.info("✅ Dokumenty již existují, přeskakuji načítání.")
-        return
-
-    logging.info(f"Načítám soubor: {file_path}")
     chunks = split_docx_to_chunks(file_path)
     if not chunks:
         logging.error("❌ Nebyly nalezeny žádné textové části.")
         return
 
-    collection.add(
-        documents=chunks,
-        metadatas=[{"source": file_path}] * len(chunks),
-        ids=[f"doc_{i}" for i in range(len(chunks))]
-    )
-    logging.info(f"✅ {len(chunks)} částí textu přidáno do ChromaDB.")
+    # Získání již existujících ID
+    existing_ids = set(collection.get()["ids"])
+
+    new_documents = []
+    new_ids = []
+    new_metadatas = []
+
+    for i, chunk in enumerate(chunks):
+        doc_id = f"doc_{i}"
+        if doc_id not in existing_ids:
+            new_documents.append(chunk)
+            new_ids.append(doc_id)
+            new_metadatas.append({"source": file_path})
+
+    if new_documents:
+        collection.add(
+            documents=new_documents,
+            metadatas=new_metadatas,
+            ids=new_ids
+        )
+        logging.info(f"✅ Přidáno {len(new_documents)} nových částí textu do ChromaDB.")
+    else:
+        logging.info("⚠️ Všechny části dokumentu již byly uloženy. Přeskakuji načítání.")
 
 
 @app.on_event("startup")
@@ -111,7 +124,7 @@ def debug():
     sample = [{"id": doc_id, "text": text} for doc_id, text in zip(documents["ids"][:5], documents["documents"][:5])]
     logging.info(f"📊 ChromaDB obsahuje {count} dokumentů.")
 
-    return {"count": count, "sample": sample"}
+    return {"count": count, "sample": sample}
 
 
 # Spuštění serveru při lokálním testování
