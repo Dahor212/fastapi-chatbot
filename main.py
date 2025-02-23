@@ -4,7 +4,6 @@ import requests
 import chromadb
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI
 from starlette.responses import JSONResponse
 from contextlib import asynccontextmanager
@@ -47,15 +46,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-# Přidání CORS middleware pro povolení všech domén
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Povolit všechny domény (nebo přizpůsobit)
-    allow_credentials=True,
-    allow_methods=["*"],  # Povolit všechny metody
-    allow_headers=["*"],  # Povolit všechny hlavičky
-)
-
 @app.post("/chat")
 async def chat(request: Request):
     data = await request.json()
@@ -76,5 +66,6 @@ async def chat(request: Request):
         return JSONResponse(content={"message": "Answer not found in the database."}, status_code=404)
 
 if __name__ == "__main__":
+    # Získej port z prostředí, nebo použij 8000 jako fallback
     port = int(os.getenv("PORT", 8000))
     uvicorn.run("main:app", host="0.0.0.0", port=port)
