@@ -28,7 +28,7 @@ def load_embeddings_from_github():
         return None
 
 @asynccontextmanager
-def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI):
     print("📥 Načítám embeddingy z GitHubu...")
     embeddings = load_embeddings_from_github()
 
