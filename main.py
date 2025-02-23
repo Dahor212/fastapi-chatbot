@@ -3,7 +3,7 @@ import os
 import requests
 import chromadb
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from openai import OpenAI
 from starlette.responses import JSONResponse
 from contextlib import asynccontextmanager
@@ -46,17 +46,24 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-@app.get("/chat")
-def chat(query: str):
+@app.post("/chat")
+async def chat(request: Request):
+    data = await request.json()
+    query = data.get("query")
+    
+    if not query:
+        raise HTTPException(status_code=400, detail="Query is required")
+
+    # Generování embeddingu pro dotaz
     query_embedding = OpenAI().embeddings.create(input=query, model="text-embedding-ada-002")["data"][0]["embedding"]
 
     # Hledání v ChromaDB
     results = collection.query(query_embeddings=[query_embedding], n_results=1)
 
     if results["documents"]:
-        return {"odpověď": results["documents"][0]}
+        return {"answer": results["documents"][0]}
     else:
-        return JSONResponse(content={"message": "Odpověď nebyla nalezena v databázi."}, status_code=404)
+        return JSONResponse(content={"message": "Answer not found in the database."}, status_code=404)
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
