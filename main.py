@@ -1,11 +1,12 @@
 import json
+import os
 import requests
 import chromadb
+import uvicorn
 from fastapi import FastAPI
 from openai import OpenAI
 from starlette.responses import JSONResponse
 from contextlib import asynccontextmanager
-import uvicorn
 
 # URL k souboru s embeddingy na GitHubu (RAW verze!)
 GITHUB_EMBEDDINGS_URL = "https://raw.githubusercontent.com/Dahor212/fastapi-chatbot/main/data/embeddings.json"
@@ -27,18 +28,18 @@ def load_embeddings_from_github():
         return None
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+def lifespan(app: FastAPI):
     print("📥 Načítám embeddingy z GitHubu...")
     embeddings = load_embeddings_from_github()
 
     if embeddings:
-        collection.delete(where={})  # Smaže všechny existující záznamy
+        collection.delete(where={"id": {"$ne": None}})  # Smaže všechny existující záznamy
         for doc_id, embedding in embeddings.items():
             collection.add(ids=[doc_id], embeddings=[embedding])
         print("✅ Embeddingy úspěšně uloženy do ChromaDB!")
 
     yield
-    print("Aplikace se ukončuje.")
+    print("🛑 Aplikace se ukončuje.")
 
 app = FastAPI(lifespan=lifespan)
 
@@ -55,4 +56,5 @@ def chat(query: str):
         return JSONResponse(content={"message": "Odpověď nebyla nalezena v databázi."}, status_code=404)
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
