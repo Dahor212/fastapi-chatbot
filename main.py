@@ -59,5 +59,5 @@ def chat(query: str):
         return JSONResponse(content={"message": "Odpověď nebyla nalezena v databázi."}, status_code=404)
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 5000))
+    port = int(os.getenv("PORT", 8000))
     uvicorn.run("main:app", host="0.0.0.0", port=port)
