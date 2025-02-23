@@ -6,6 +6,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from openai import OpenAI
 from starlette.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 # URL k souboru s embeddingy na GitHubu (RAW verze!)
@@ -46,6 +47,15 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+# Přidání CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Povolí všechny domény
+    allow_credentials=True,
+    allow_methods=["*"],  # Povolí všechny metody
+    allow_headers=["*"],  # Povolí všechny hlavičky
+)
+
 # Základní route pro /
 @app.get("/")
 async def root():
@@ -54,7 +64,7 @@ async def root():
 # Route pro favicon.ico
 @app.get("/favicon.ico")
 async def favicon():
-    return JSONResponse(status_code=204)  # Vrátí prázdnou odpověď
+    return JSONResponse(content={}, status_code=204)  # Vrátí prázdnou odpověď
 
 @app.post("/chat")
 async def chat(request: Request):
