@@ -33,7 +33,9 @@ async def lifespan(app: FastAPI):
     embeddings = load_embeddings_from_github()
 
     if embeddings:
-        collection.delete()  # Správné mazání celé kolekce
+        existing_ids = collection.get()["ids"]
+        if existing_ids:
+            collection.delete(ids=existing_ids)  # Správné mazání celé kolekce
         for doc_id, embedding in embeddings.items():
             collection.add(ids=[doc_id], embeddings=[embedding])
         print("✅ Embeddingy úspěšně uloženy do ChromaDB!")
