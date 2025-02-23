@@ -4,10 +4,13 @@ import requests
 import chromadb
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
-from openai import OpenAI
+import openai  # Přidáme OpenAI import
 from starlette.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+
+# Načtení API klíče z prostředí
+openai.api_key = os.getenv("OPENAI_API_KEY")  # Získáme API klíč z prostředí
 
 # URL k souboru s embeddingy na GitHubu (RAW verze!)
 GITHUB_EMBEDDINGS_URL = "https://raw.githubusercontent.com/Dahor212/fastapi-chatbot/main/data/embeddings.json"
@@ -74,8 +77,12 @@ async def chat(request: Request):
     if not query:
         raise HTTPException(status_code=400, detail="Query is required")
 
-    # Generování embeddingu pro dotaz
-    query_embedding = OpenAI().embeddings.create(input=query, model="text-embedding-ada-002")["data"][0]["embedding"]
+    try:
+        # Generování embeddingu pro dotaz
+        query_embedding = openai.Embedding.create(input=query, model="text-embedding-ada-002")["data"][0]["embedding"]
+    except openai.error.OpenAIError as e:
+        print(f"❌ Chyba při připojení k OpenAI API: {e}")
+        raise HTTPException(status_code=500, detail="Error connecting to OpenAI API")
 
     # Hledání v ChromaDB
     results = collection.query(query_embeddings=[query_embedding], n_results=1)
