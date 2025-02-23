@@ -46,6 +46,16 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+# Základní route pro /
+@app.get("/")
+async def root():
+    return {"message": "Hello, world!"}
+
+# Route pro favicon.ico
+@app.get("/favicon.ico")
+async def favicon():
+    return JSONResponse(status_code=204)  # Vrátí prázdnou odpověď
+
 @app.post("/chat")
 async def chat(request: Request):
     data = await request.json()
