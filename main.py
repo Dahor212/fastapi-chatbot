@@ -4,6 +4,7 @@ import requests
 import chromadb
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI
 from starlette.responses import JSONResponse
 from contextlib import asynccontextmanager
@@ -45,6 +46,15 @@ async def lifespan(app: FastAPI):
     print("🛑 Aplikace se ukončuje.")
 
 app = FastAPI(lifespan=lifespan)
+
+# Přidání CORS middleware pro povolení všech domén
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Povolit všechny domény (nebo přizpůsobit)
+    allow_credentials=True,
+    allow_methods=["*"],  # Povolit všechny metody
+    allow_headers=["*"],  # Povolit všechny hlavičky
+)
 
 @app.post("/chat")
 async def chat(request: Request):
