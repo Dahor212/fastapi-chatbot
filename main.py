@@ -36,8 +36,9 @@ async def lifespan(app: FastAPI):
         existing_ids = collection.get()["ids"]
         if existing_ids:
             collection.delete(ids=existing_ids)  # Správné mazání celé kolekce
-        for doc_id, embedding in embeddings.items():
-            collection.add(ids=[doc_id], embeddings=[embedding])
+        for doc_id, data in embeddings.items():
+            if "embedding" in data:
+                collection.add(ids=[doc_id], embeddings=[data["embedding"]])
         print("✅ Embeddingy úspěšně uloženy do ChromaDB!")
 
     yield
