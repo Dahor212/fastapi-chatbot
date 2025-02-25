@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 # Načtení API klíče z prostředí
-openai.api_key = os.getenv("OPENAI_API_KEY")  # Získáme API klíč z prostředí
+openai.api_key = os.getenv("OPENAI_API_KEY")  # Získáme API klíč z prostřed
 
 # URL k souboru s embeddingy na GitHubu (RAW verze!)
 GITHUB_EMBEDDINGS_URL = "https://raw.githubusercontent.com/Dahor212/fastapi-chatbot/main/data/embeddings.json"
