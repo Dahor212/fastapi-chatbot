@@ -1,82 +1,60 @@
 from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 import requests
 import chromadb
-import logging
+import json
+import os
 
-# Nastavení logování
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Inicializace FastAPI
 app = FastAPI()
 
-# Povolení CORS, aby aplikace správně fungovala přes různé domény
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Můžeš omezit na konkrétní domény
-    allow_credentials=True,
-    allow_methods=["*"],  # Povolení všech metod (GET, POST, OPTIONS, ...)
-    allow_headers=["*"],  # Povolit všechny hlavičky
-)
+# URL GitHub raw souboru s embeddingy
+github_url = "https://raw.githubusercontent.com/tvuj-repo/tvuj-soubor.json"
 
-# Přidáme root endpoint, aby nedocházelo k chybě 404 na "/"
-@app.get("/")
-async def root():
-    return {"message": "API běží! Pošli POST request na /chat."}
-
-# Cesta k embeddingům na GitHubu
-GITHUB_EMBEDDINGS_URL = "https://raw.githubusercontent.com/Dahor212/fastapi-chatbot/refs/heads/main/data/embeddings.json"
+# Načtení embeddingů z GitHubu
+try:
+    response = requests.get(github_url)
+    response.raise_for_status()
+    embeddings_data = response.json()
+    print("✅ Embeddingy úspěšně načteny z GitHubu!")
+except Exception as e:
+    print(f"❌ Chyba při načítání embeddingů: {e}")
+    embeddings_data = []
 
 # Inicializace ChromaDB
 client = chromadb.PersistentClient(path="./chroma_db")
-collection = client.get_or_create_collection(name="docs")
+collection = client.get_or_create_collection(name="documents")
 
-def load_embeddings():
-    logger.info("📥 Načítám embeddingy z GitHubu...")
-    response = requests.get(GITHUB_EMBEDDINGS_URL)
-    if response.status_code == 200:
-        data = response.json()
-        logger.info("✅ Embeddingy úspěšně načteny z GitHubu!")
-        return data
-    else:
-        logger.error("❌ Nepodařilo se načíst embeddingy! Status code: %d", response.status_code)
-        return None
-
-embeddings_data = load_embeddings()
-
-if embeddings_data:
-    for entry in embeddings_data:
-        doc_id = str(entry["id"])  # Převede ID na řetězec
-        embedding = entry["embedding"]  # Získání embeddingu
-        collection.add(ids=[doc_id], embeddings=[embedding], metadatas=[entry.get("metadata", {})])  
-    logger.info("✅ Embeddingy úspěšně uloženy do ChromaDB!")
-else:
-    logger.error("❌ Chyba při načítání embeddingů, aplikace nemusí fungovat správně!")
-
-class QueryRequest(BaseModel):
-    query: str
+# Uložení embeddingů do ChromaDB
+for entry in embeddings_data:
+    collection.add(
+        ids=[entry["id"]],
+        embeddings=[entry["embedding"]],
+        metadatas=[{"text": entry["text"]}]
+    )
+print("✅ Embeddingy úspěšně uloženy do ChromaDB!")
 
 def get_query_embedding(query: str):
-    return embeddings_data.get(query)
+    for entry in embeddings_data:
+        if entry["text"] == query:
+            return entry["embedding"]
+    return None
 
 @app.post("/chat")
-async def chat(request: QueryRequest):
-    logger.info("🔍 Přijatý dotaz: %s", request.query)
+def chat(request: dict):
+    query = request.get("query")
+    if not query:
+        raise HTTPException(status_code=400, detail="Chybí dotaz.")
     
-    query_embedding = get_query_embedding(request.query)
+    query_embedding = get_query_embedding(query)
     if not query_embedding:
-        logger.warning("⚠️ Embedding dotazu nebyl nalezen!")
-        return {"response": "Embedding dotazu nebyl nalezen."}
+        return {"response": "Na tuto otázku nemám odpověď."}
     
-    results = collection.query(query_embeddings=[query_embedding], n_results=3)
+    results = collection.query(query_embeddings=[query_embedding], n_results=1)
     
-    if not results["documents"]:
-        logger.warning("⚠️ Odpověď nebyla nalezena v databázi!")
-        return {"response": "Odpověď nebyla nalezena v databázi."}
-    
-    logger.info("📄 Nalezené dokumenty: %s", results["documents"])
-    response_text = "\n".join(results["documents"][0])
-    
-    return {"response": response_text}
+    if results["ids"]:
+        return {"response": results["metadatas"][0]["text"]}
+    else:
+        return {"response": "Na tuto otázku nemám odpověď."}
+
+@app.get("/")
+def root():
+    return {"message": "API běží!"}
