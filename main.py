@@ -20,13 +20,12 @@ client = chromadb.PersistentClient(path="./chroma_db")
 collection = client.get_or_create_collection(name="docs")
 
 def load_embeddings():
-    """ Načtení embeddingů z GitHubu. """
     logger.info("📥 Načítám embeddingy z GitHubu...")
     response = requests.get(GITHUB_EMBEDDINGS_URL)
     if response.status_code == 200:
         data = response.json()
         logger.info("✅ Embeddingy úspěšně načteny z GitHubu!")
-        return data  # Vrací seznam, ne slovník!
+        return data
     else:
         logger.error("❌ Nepodařilo se načíst embeddingy! Status code: %d", response.status_code)
         return None
@@ -35,7 +34,7 @@ embeddings_data = load_embeddings()
 
 if embeddings_data:
     for entry in embeddings_data:
-        doc_id = entry["id"]  # Získání ID dokumentu
+        doc_id = str(entry["id"])  # Převede ID na řetězec
         embedding = entry["embedding"]  # Získání embeddingu
         collection.add(ids=[doc_id], embeddings=[embedding], metadatas=[entry.get("metadata", {})])  
     logger.info("✅ Embeddingy úspěšně uloženy do ChromaDB!")
@@ -46,11 +45,7 @@ class QueryRequest(BaseModel):
     query: str
 
 def get_query_embedding(query: str):
-    """ Najde embedding pro daný dotaz. """
-    for entry in embeddings_data:
-        if entry["id"] == query:  # Předpokládá, že query odpovídá nějakému dokumentu
-            return entry["embedding"]
-    return None
+    return embeddings_data.get(query)
 
 @app.post("/chat")
 async def chat(request: QueryRequest):
