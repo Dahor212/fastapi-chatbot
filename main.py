@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI()
 
 # Cesta k embeddingům na GitHubu
-GITHUB_EMBEDDINGS_URL = "https://raw.githubusercontent.com/uzivatel/repo/main/embeddings.json"
+GITHUB_EMBEDDINGS_URL = "https://raw.githubusercontent.com/Dahor212/fastapi-chatbot/refs/heads/main/data/embeddings.json"
 
 # Inicializace ChromaDB
 client = chromadb.PersistentClient(path="./chroma_db")
