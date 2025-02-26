@@ -4,22 +4,22 @@ import requests
 import chromadb
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
-import openai  # Přidáme OpenAI import
+import openai
 from starlette.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 # Načtení API klíče z prostředí
-openai.api_key = os.getenv("OPENAI_API_KEY")  # Získáme API klíč z prostředí
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # URL k souboru s embeddingy na GitHubu (RAW verze!)
 GITHUB_EMBEDDINGS_URL = "https://raw.githubusercontent.com/Dahor212/fastapi-chatbot/main/data/embeddings.json"
 
-# Inicializace Chroma
+# Inicializace ChromaDB
 chroma_client = chromadb.PersistentClient(path="./chroma_db")
 collection = chroma_client.get_or_create_collection(name="documents")
 
-# Načtení embeddingů z GitHubu
+# Funkce pro načtení embeddingů z GitHubu
 def load_embeddings_from_github():
     try:
         response = requests.get(GITHUB_EMBEDDINGS_URL)
@@ -39,7 +39,7 @@ async def lifespan(app: FastAPI):
     if embeddings:
         existing_ids = collection.get()["ids"]
         if existing_ids:
-            collection.delete(ids=existing_ids)  # Správné mazání celé kolekce
+            collection.delete(ids=existing_ids)
         for doc_id, data in embeddings.items():
             if "embedding" in data:
                 collection.add(ids=[doc_id], embeddings=[data["embedding"]])
@@ -50,13 +50,13 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-# Přidání CORS middleware
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Povolí všechny domény
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # Povolí všechny metody
-    allow_headers=["*"],  # Povolí všechny hlavičky
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Základní route pro /
@@ -67,19 +67,20 @@ async def root():
 # Route pro favicon.ico
 @app.get("/favicon.ico")
 async def favicon():
-    return JSONResponse(content={}, status_code=204)  # Vrátí prázdnou odpověď
+    return JSONResponse(content={}, status_code=204)
 
 @app.post("/chat")
 async def chat(request: Request):
     data = await request.json()
     query = data.get("query")
-    
+
     if not query:
         raise HTTPException(status_code=400, detail="Query is required")
 
     try:
         # Generování embeddingu pro dotaz
-        query_embedding = openai.Embedding.create(input=query, model="text-embedding-ada-002")["data"][0]["embedding"]
+        response = openai.Embedding.create(input=[query], model="text-embedding-ada-002")
+        query_embedding = response["data"][0]["embedding"]
     except openai.error.OpenAIError as e:
         print(f"❌ Chyba při připojení k OpenAI API: {e}")
         raise HTTPException(status_code=500, detail="Error connecting to OpenAI API")
@@ -87,12 +88,11 @@ async def chat(request: Request):
     # Hledání v ChromaDB
     results = collection.query(query_embeddings=[query_embedding], n_results=1)
 
-    if results["documents"]:
-        return JSONResponse(content={"answer": results["documents"][0]}, status_code=200)
+    if results and "documents" in results and results["documents"]:
+        return JSONResponse(content={"response": results["documents"][0]})
     else:
         return JSONResponse(content={"message": "Answer not found in the database."}, status_code=404)
 
 if __name__ == "__main__":
-    # Získej port z prostředí, nebo použij 8000 jako fallback
-    port = int(os.getenv("PORT", 8000))
+    port = int(os.getenv("PORT", 10000))
     uvicorn.run("main:app", host="0.0.0.0", port=port)
