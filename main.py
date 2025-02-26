@@ -1,8 +1,8 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import requests
 import chromadb
-import json
 import logging
 
 # Nastavení logování
@@ -11,6 +11,20 @@ logger = logging.getLogger(__name__)
 
 # Inicializace FastAPI
 app = FastAPI()
+
+# Povolení CORS, aby aplikace správně fungovala přes různé domény
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Můžeš omezit na konkrétní domény
+    allow_credentials=True,
+    allow_methods=["*"],  # Povolení všech metod (GET, POST, OPTIONS, ...)
+    allow_headers=["*"],  # Povolit všechny hlavičky
+)
+
+# Přidáme root endpoint, aby nedocházelo k chybě 404 na "/"
+@app.get("/")
+async def root():
+    return {"message": "API běží! Pošli POST request na /chat."}
 
 # Cesta k embeddingům na GitHubu
 GITHUB_EMBEDDINGS_URL = "https://raw.githubusercontent.com/Dahor212/fastapi-chatbot/refs/heads/main/data/embeddings.json"
