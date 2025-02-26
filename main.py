@@ -5,7 +5,7 @@ import chromadb
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 import openai  # Přidáme OpenAI import
-from starlette.responses import JSONResponse, StreamingResponse
+from starlette.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
@@ -88,12 +88,7 @@ async def chat(request: Request):
     results = collection.query(query_embeddings=[query_embedding], n_results=1)
 
     if results["documents"]:
-        # Místo odesílání celé odpovědi najednou, použij StreamingResponse
-        def generate():
-            for doc in results["documents"]:
-                yield doc  # Postupně posílej obsah odpovědi
-
-        return StreamingResponse(generate(), media_type="text/plain")
+        return JSONResponse(content={"answer": results["documents"][0]}, status_code=200)
     else:
         return JSONResponse(content={"message": "Answer not found in the database."}, status_code=404)
 
