@@ -7,7 +7,7 @@ import os
 app = FastAPI()
 
 # URL GitHub raw souboru s embeddingy
-github_url = "https://raw.githubusercontent.com/tvuj-repo/tvuj-soubor.json"
+github_url = "https://raw.githubusercontent.com/Dahor212/fastapi-chatbot/refs/heads/main/data/embeddings.json"
 
 # Načtení embeddingů z GitHubu
 try:
