@@ -73,24 +73,18 @@ async def chat(request: Request):
     if not query:
         raise HTTPException(status_code=400, detail="Query is required")
 
+    # Získání embeddingů dotazu (zatím neřešeno generování, pouze vektorové hledání)
     try:
-        # Načtení embeddingu dotazu z GitHubu
-        embeddings = load_embeddings_from_github()
-        if query in embeddings:
-            query_embedding = embeddings[query]["embedding"]
+        results = collection.query(query_texts=[query], n_results=1)
+
+        if results and "documents" in results and results["documents"]:
+            return JSONResponse(content={"response": results["documents"][0]})
         else:
-            return JSONResponse(content={"message": "Embedding dotazu nebyl nalezen."}, status_code=404)
+            return JSONResponse(content={"message": "Odpověď nebyla nalezena v databázi."}, status_code=404)
+
     except Exception as e:
-        print(f"❌ Chyba při načítání embeddingu dotazu: {e}")
-        raise HTTPException(status_code=500, detail="Error loading query embedding")
-
-    # Hledání v ChromaDB
-    results = collection.query(query_embeddings=[query_embedding], n_results=1)
-
-    if results and "documents" in results and results["documents"]:
-        return JSONResponse(content={"response": results["documents"][0]})
-    else:
-        return JSONResponse(content={"message": "Odpověď nebyla nalezena v databázi."}, status_code=404)
+        print(f"❌ Chyba při vyhledávání: {e}")
+        raise HTTPException(status_code=500, detail="Error processing query")
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 10000))
