@@ -42,7 +42,7 @@ async def lifespan(app: FastAPI):
             collection.delete(ids=existing_ids)
         for doc_id, data in embeddings.items():
             if "embedding" in data:
-                collection.add(ids=[doc_id], embeddings=[data["embedding"]])
+                collection.add(ids=[doc_id], embeddings=[data["embedding"]], documents=[data["text"]])
         print("✅ Embeddingy úspěšně uloženy do ChromaDB!")
 
     yield
@@ -62,7 +62,7 @@ app.add_middleware(
 # Základní route pro /
 @app.get("/")
 async def root():
-    return {"message": "Hello, world!"}
+    return {"message": "API je spuštěno!"}
 
 # Route pro favicon.ico
 @app.get("/favicon.ico")
@@ -91,7 +91,7 @@ async def chat(request: Request):
     if results and "documents" in results and results["documents"]:
         return JSONResponse(content={"response": results["documents"][0]})
     else:
-        return JSONResponse(content={"message": "Answer not found in the database."}, status_code=404)
+        return JSONResponse(content={"message": "Odpověď nebyla nalezena v databázi."}, status_code=404)
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 10000))
