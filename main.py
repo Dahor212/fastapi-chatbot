@@ -1,91 +1,66 @@
-import json
-import os
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 import requests
 import chromadb
-import uvicorn
-from fastapi import FastAPI, HTTPException, Request
-from starlette.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
+import json
+import logging
 
-# URL k souboru s embeddingy na GitHubu (RAW verze!)
-GITHUB_EMBEDDINGS_URL = "https://raw.githubusercontent.com/Dahor212/fastapi-chatbot/main/data/embeddings.json"
+# Nastavení logování
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Inicializace FastAPI
+app = FastAPI()
+
+# Cesta k embeddingům na GitHubu
+GITHUB_EMBEDDINGS_URL = "https://raw.githubusercontent.com/uzivatel/repo/main/embeddings.json"
 
 # Inicializace ChromaDB
-chroma_client = chromadb.PersistentClient(path="./chroma_db")
-collection = chroma_client.get_or_create_collection(name="documents")
+client = chromadb.PersistentClient(path="./chroma_db")
+collection = client.get_or_create_collection(name="docs")
 
-# Funkce pro načtení embeddingů z GitHubu
-def load_embeddings_from_github():
-    try:
-        response = requests.get(GITHUB_EMBEDDINGS_URL)
-        response.raise_for_status()
-        embeddings_data = response.json()
-        print("✅ Embeddingy úspěšně načteny z GitHubu!")
-        return embeddings_data
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Chyba při načítání embeddingů z GitHubu: {e}")
+def load_embeddings():
+    logger.info("📥 Načítám embeddingy z GitHubu...")
+    response = requests.get(GITHUB_EMBEDDINGS_URL)
+    if response.status_code == 200:
+        data = response.json()
+        logger.info("✅ Embeddingy úspěšně načteny z GitHubu!")
+        return data
+    else:
+        logger.error("❌ Nepodařilo se načíst embeddingy! Status code: %d", response.status_code)
         return None
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    print("📥 Načítám embeddingy z GitHubu...")
-    embeddings = load_embeddings_from_github()
+embeddings_data = load_embeddings()
 
-    if embeddings:
-        existing_ids = collection.get()["ids"]
-        if existing_ids:
-            collection.delete(ids=existing_ids)
-        for doc_id, data in embeddings.items():
-            if "embedding" in data:
-                collection.add(ids=[doc_id], embeddings=[data["embedding"]], documents=[data["text"]])
-        print("✅ Embeddingy úspěšně uloženy do ChromaDB!")
+if embeddings_data:
+    for doc_id, embedding in embeddings_data.items():
+        collection.add(ids=[doc_id], embeddings=[embedding], metadatas=[{"source": doc_id}])
+    logger.info("✅ Embeddingy úspěšně uloženy do ChromaDB!")
+else:
+    logger.error("❌ Chyba při načítání embeddingů, aplikace nemusí fungovat správně!")
 
-    yield
-    print("🛑 Aplikace se ukončuje.")
+class QueryRequest(BaseModel):
+    query: str
 
-app = FastAPI(lifespan=lifespan)
-
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Základní route pro /
-@app.get("/")
-async def root():
-    return {"message": "API je spuštěno!"}
-
-# Route pro favicon.ico
-@app.get("/favicon.ico")
-async def favicon():
-    return JSONResponse(content={}, status_code=204)
+def get_query_embedding(query: str):
+    return embeddings_data.get(query)
 
 @app.post("/chat")
-async def chat(request: Request):
-    data = await request.json()
-    query = data.get("query")
-
-    if not query:
-        raise HTTPException(status_code=400, detail="Query is required")
-
-    # Získání embeddingů dotazu (zatím neřešeno generování, pouze vektorové hledání)
-    try:
-        results = collection.query(query_texts=[query], n_results=1)
-
-        if results and "documents" in results and results["documents"]:
-            return JSONResponse(content={"response": results["documents"][0]})
-        else:
-            return JSONResponse(content={"message": "Odpověď nebyla nalezena v databázi."}, status_code=404)
-
-    except Exception as e:
-        print(f"❌ Chyba při vyhledávání: {e}")
-        raise HTTPException(status_code=500, detail="Error processing query")
-
-if __name__ == "__main__":
-    port = int(os.getenv("PORT", 10000))
-    uvicorn.run("main:app", host="0.0.0.0", port=port)
+async def chat(request: QueryRequest):
+    logger.info("🔍 Přijatý dotaz: %s", request.query)
+    
+    query_embedding = get_query_embedding(request.query)
+    if not query_embedding:
+        logger.warning("⚠️ Embedding dotazu nebyl nalezen!")
+        return {"response": "Embedding dotazu nebyl nalezen."}
+    
+    results = collection.query(query_embeddings=[query_embedding], n_results=3)
+    
+    if not results["documents"]:
+        logger.warning("⚠️ Odpověď nebyla nalezena v databázi!")
+        return {"response": "Odpověď nebyla nalezena v databázi."}
+    
+    logger.info("📄 Nalezené dokumenty: %s", results["documents"])
+    response_text = "\n".join(results["documents"][0])
+    
+    return {"response": response_text}
