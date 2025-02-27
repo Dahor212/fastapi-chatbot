@@ -7,7 +7,7 @@ import os
 app = FastAPI()
 
 # URL GitHub raw souboru s embeddingy
-github_url = "https://raw.githubusercontent.com/Dahor212/fastapi-chatbot/refs/heads/main/data/embeddings.json"
+github_url = "https://raw.githubusercontent.com/Dahor212/fastapi-chatbot/main/data/embeddings.json"
 
 # Načtení embeddingů z GitHubu
 try:
@@ -23,18 +23,19 @@ except Exception as e:
 client = chromadb.PersistentClient(path="./chroma_db")
 collection = client.get_or_create_collection(name="documents")
 
-# Uložení embeddingů do ChromaDB
+# Uložení embeddingů do ChromaDB s opravou klíče "text"
 for entry in embeddings_data:
-    collection.add(
-        ids=[entry["id"]],
-        embeddings=[entry["embedding"]],
-        metadatas=[{"text": entry["text"]}]
-    )
+    if "id" in entry and "embedding" in entry and "metadata" in entry:  # Oprava: kontrola "metadata"
+        collection.add(
+            ids=[str(entry["id"])],  # ID musí být string
+            embeddings=[entry["embedding"]],
+            metadatas=[entry["metadata"]]  # Oprava: Použít metadata
+        )
 print("✅ Embeddingy úspěšně uloženy do ChromaDB!")
 
 def get_query_embedding(query: str):
     for entry in embeddings_data:
-        if entry["text"] == query:
+        if "metadata" in entry and entry["metadata"].get("source") == query:
             return entry["embedding"]
     return None
 
@@ -51,7 +52,7 @@ def chat(request: dict):
     results = collection.query(query_embeddings=[query_embedding], n_results=1)
     
     if results["ids"]:
-        return {"response": results["metadatas"][0]["text"]}
+        return {"response": results["metadatas"][0][0]["source"]]}  # Oprava indexace
     else:
         return {"response": "Na tuto otázku nemám odpověď."}
 
