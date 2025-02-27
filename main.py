@@ -12,7 +12,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"] ,
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
@@ -36,6 +36,7 @@ collection = client.get_or_create_collection(name="documents")
 # Uložení embeddingů do ChromaDB
 for entry in embeddings_data:
     if "id" in entry and "embedding" in entry and "metadata" in entry:
+        print(f"Adding embedding with ID: {entry['id']}")  # Logování přidání embeddingu
         collection.add(
             ids=[str(entry["id"])],
             embeddings=[entry["embedding"]],
@@ -44,26 +45,41 @@ for entry in embeddings_data:
 print("✅ Embeddingy úspěšně uloženy do ChromaDB!")
 
 def get_query_embedding(query: str):
+    """
+    Tato funkce se pokouší najít embedding pro zadaný dotaz v metadatech.
+    """
     for entry in embeddings_data:
-        if "metadata" in entry and entry["metadata"].get("source") == query:
-            return entry["embedding"]
+        if "metadata" in entry:
+            print(f"Checking embedding for query: {entry['metadata'].get('source')}")
+            if entry["metadata"].get("source") == query:
+                return entry["embedding"]
+    print("No matching embedding found for the query.")
     return None
 
 @app.options("/chat")
 def options_chat():
+    """
+    Odpověď na OPTIONS požadavek pro CORS.
+    """
     return {}
 
 @app.post("/chat")
 def chat(request: dict):
+    """
+    Hlavní funkce pro zpracování dotazu, která se pokusí získat odpověď z ChromaDB.
+    """
     query = request.get("query")
     if not query:
         raise HTTPException(status_code=400, detail="Chybí dotaz.")
     
+    # Získání embeddingu pro dotaz
     query_embedding = get_query_embedding(query)
     if not query_embedding:
         return {"response": "Na tuto otázku nemám odpověď."}
     
+    # Dotaz na ChromaDB
     results = collection.query(query_embeddings=[query_embedding], n_results=1)
+    print(f"Query results: {results}")  # Logování výsledků dotazu
     
     if results["ids"]:
         return {"response": results["metadatas"][0]["source"]}
@@ -72,4 +88,7 @@ def chat(request: dict):
 
 @app.get("/")
 def root():
+    """
+    Základní endpoint pro testování, zda API běží.
+    """
     return {"message": "API běží!"}
