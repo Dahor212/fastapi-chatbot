@@ -1,23 +1,15 @@
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, HTTPException
 import requests
 import chromadb
 import json
 import os
+from io import BytesIO
+from docx import Document
 
 app = FastAPI()
 
-# Povolení CORS pro frontend
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # URL GitHub raw souboru s embeddingy
-github_url = "https://raw.githubusercontent.com/Dahor212/fastapi-chatbot/main/data/embeddings.json"
+github_url = "https://raw.githubusercontent.com/Dahor212/fastapi-chatbot/refs/heads/main/data/embeddings.json"
 
 # Načtení embeddingů z GitHubu
 try:
@@ -60,6 +52,20 @@ def get_query_embedding(query: str):
     print("No matching embedding found for the query.")
     return None
 
+def extract_text_from_docx(doc_url: str) -> str:
+    """
+    Načte obsah Word dokumentu (.docx) z URL a vrátí text.
+    """
+    response = requests.get(doc_url)
+    if response.status_code == 200:
+        doc = Document(BytesIO(response.content))
+        full_text = []
+        for para in doc.paragraphs:
+            full_text.append(para.text)
+        return '\n'.join(full_text)
+    else:
+        raise Exception("Nepodařilo se stáhnout soubor.")
+
 @app.options("/chat")
 def options_chat():
     """
@@ -89,12 +95,18 @@ def chat(request: dict):
         # Pokud je v metadatech 'source', vrátí se tento text jako odpověď
         if results["metadatas"] and results["metadatas"][0]:
             metadata = results["metadatas"][0]
-            if isinstance(metadata, dict) and "source" in metadata:
-                # Pokud je v metadatu 'source', vrátí se obsah metadatu
-                return {"response": f"Dokument: {metadata['source']}"}
-            else:
-                # Pokud není metadatum správně strukturováno, vrátí se výchozí odpověď
-                return {"response": "Na tuto otázku nemám odpověď."}
+            if isinstance(metadata, list) and metadata:
+                # Vrátí se název souboru z 'source'
+                doc_name = metadata[0].get('source', '')
+                # Vytvoření URL pro stažení souboru z GitHubu
+                doc_url = f"https://github.com/Dahor212/fastapi-chatbot/blob/main/soubory/csob%20vypisy.docx"
+                try:
+                    # Extrahování textu z dokumentu
+                    document_text = extract_text_from_docx(doc_url)
+                    return {"response": document_text}
+                except Exception as e:
+                    return {"response": f"Chyba při načítání dokumentu: {str(e)}"}
+            return {"response": "Na tuto otázku nemám odpověď."}
         else:
             return {"response": "Na tuto otázku nemám odpověď."}
     else:
