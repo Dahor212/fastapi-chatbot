@@ -82,7 +82,11 @@ def chat(request: dict):
     print(f"Query results: {results}")  # Logování výsledků dotazu
     
     if results["ids"]:
-        return {"response": results["metadatas"][0]["source"]}
+        # Opravený přístup k metadatu
+        if results["metadatas"] and results["metadatas"][0]:
+            return {"response": results["metadatas"][0].get("source", "Na tuto otázku nemám odpověď.")}
+        else:
+            return {"response": "Na tuto otázku nemám odpověď."}
     else:
         return {"response": "Na tuto otázku nemám odpověď."}
 
