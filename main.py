@@ -1,8 +1,9 @@
+import os
+import uvicorn
 from fastapi import FastAPI, HTTPException
 import requests
 import chromadb
 import json
-import os
 from io import BytesIO
 from docx import Document
 
@@ -68,53 +69,36 @@ def extract_text_from_docx(doc_url: str) -> str:
 
 @app.options("/chat")
 def options_chat():
-    """
-    Odpověď na OPTIONS požadavek pro CORS.
-    """
     return {}
 
 @app.post("/chat")
 def chat(request: dict):
-    """
-    Hlavní funkce pro zpracování dotazu, která se pokusí získat odpověď z ChromaDB.
-    """
     query = request.get("query")
     if not query:
         raise HTTPException(status_code=400, detail="Chybí dotaz.")
     
-    # Získání embeddingu pro dotaz
     query_embedding = get_query_embedding(query)
     if not query_embedding:
         return {"response": "Na tuto otázku nemám odpověď."}
     
-    # Dotaz na ChromaDB
     results = collection.query(query_embeddings=[query_embedding], n_results=1)
-    print(f"Query results: {results}")  # Logování výsledků dotazu
+    print(f"Query results: {results}")  
     
     if results["ids"]:
-        # Pokud je v metadatech 'source', vrátí se tento text jako odpověď
         if results["metadatas"] and results["metadatas"][0]:
             metadata = results["metadatas"][0]
-            if isinstance(metadata, list) and metadata:
-                # Vrátí se název souboru z 'source'
-                doc_name = metadata[0].get('source', '')
-                # Vytvoření URL pro stažení souboru z GitHubu
-                doc_url = f"https://github.com/Dahor212/fastapi-chatbot/blob/main/soubory/csob%20vypisy.docx"
-                try:
-                    # Extrahování textu z dokumentu
-                    document_text = extract_text_from_docx(doc_url)
-                    return {"response": document_text}
-                except Exception as e:
-                    return {"response": f"Chyba při načítání dokumentu: {str(e)}"}
+            doc_name = metadata[0].get('source', '')
+            doc_url = f"https://raw.githubusercontent.com/Dahor212/fastapi-chatbot/refs/heads/main/soubory/{doc_name}"
+            try:
+                document_text = extract_text_from_docx(doc_url)
+                return {"response": document_text}
+            except Exception as e:
+                return {"response": f"Chyba při načítání dokumentu: {str(e)}"}
             return {"response": "Na tuto otázku nemám odpověď."}
         else:
             return {"response": "Na tuto otázku nemám odpověď."}
     else:
         return {"response": "Na tuto otázku nemám odpověď."}
 
-@app.get("/")
-def root():
-    """
-    Základní endpoint pro testování, zda API běží.
-    """
-    return {"message": "API běží!"}
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
