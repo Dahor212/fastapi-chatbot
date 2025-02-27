@@ -88,11 +88,13 @@ def chat(request: dict):
     if results["ids"]:
         # Pokud je v metadatech 'source', vrátí se tento text jako odpověď
         if results["metadatas"] and results["metadatas"][0]:
-            # Opravený přístup k metadatu
             metadata = results["metadatas"][0]
-            if isinstance(metadata, list) and metadata:
-                return {"response": metadata[0].get("source", "Na tuto otázku nemám odpověď.")}
-            return {"response": "Na tuto otázku nemám odpověď."}
+            if isinstance(metadata, dict) and "source" in metadata:
+                # Pokud je v metadatu 'source', vrátí se obsah metadatu
+                return {"response": f"Dokument: {metadata['source']}"}
+            else:
+                # Pokud není metadatum správně strukturováno, vrátí se výchozí odpověď
+                return {"response": "Na tuto otázku nemám odpověď."}
         else:
             return {"response": "Na tuto otázku nemám odpověď."}
     else:
