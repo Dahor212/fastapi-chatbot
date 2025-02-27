@@ -23,13 +23,13 @@ except Exception as e:
 client = chromadb.PersistentClient(path="./chroma_db")
 collection = client.get_or_create_collection(name="documents")
 
-# Uložení embeddingů do ChromaDB s opravou klíče "text"
+# Uložení embeddingů do ChromaDB
 for entry in embeddings_data:
-    if "id" in entry and "embedding" in entry and "metadata" in entry:  # Oprava: kontrola "metadata"
+    if "id" in entry and "embedding" in entry and "metadata" in entry:
         collection.add(
             ids=[str(entry["id"])],  # ID musí být string
             embeddings=[entry["embedding"]],
-            metadatas=[entry["metadata"]]  # Oprava: Použít metadata
+            metadatas=[entry["metadata"]]  # Metadata obsahují "source"
         )
 print("✅ Embeddingy úspěšně uloženy do ChromaDB!")
 
@@ -52,7 +52,7 @@ def chat(request: dict):
     results = collection.query(query_embeddings=[query_embedding], n_results=1)
     
     if results["ids"]:
-        return {"response": results["metadatas"][0][0]["source"]]}  # Oprava indexace
+        return {"response": results["metadatas"][0]["source"]}  # Oprava chyby
     else:
         return {"response": "Na tuto otázku nemám odpověď."}
 
