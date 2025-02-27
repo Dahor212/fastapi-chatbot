@@ -1,6 +1,5 @@
 fastapi
 uvicorn
-chromadb
-openai
 requests
-starlette
+chromadb
+python-docx
