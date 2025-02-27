@@ -46,14 +46,16 @@ print("✅ Embeddingy úspěšně uloženy do ChromaDB!")
 
 def get_query_embedding(query: str):
     """
-    Tato funkce se pokouší najít embedding pro zadaný dotaz v metadatech.
-    Pokud není text v embeddingu, použije se pouze název souboru v metadatech.
+    Tato funkce se pokouší najít embedding pro zadaný dotaz v obsahu (ne jen názvu souboru).
     """
     for entry in embeddings_data:
-        if "metadata" in entry:
+        if "metadata" in entry and "embedding" in entry:
             print(f"Checking embedding for query: {entry['metadata'].get('source')}")
-            # Pokud je metadata a název souboru odpovídá dotazu, vrátí embedding
+            # Hledání textu, který odpovídá dotazu
             if query.lower() in entry["metadata"].get("source", "").lower():
+                return entry["embedding"]
+            # Pokud je to text dokumentu, vyhledej obsah textu pro odpověď
+            if query.lower() in str(entry["embedding"]).lower():  # Porovnání s embeddingem
                 return entry["embedding"]
     print("No matching embedding found for the query.")
     return None
