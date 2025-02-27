@@ -1,10 +1,20 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 import requests
 import chromadb
 import json
 import os
 
 app = FastAPI()
+
+# Povolení CORS pro frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"] ,
+    allow_headers=["*"],
+)
 
 # URL GitHub raw souboru s embeddingy
 github_url = "https://raw.githubusercontent.com/Dahor212/fastapi-chatbot/main/data/embeddings.json"
@@ -27,9 +37,9 @@ collection = client.get_or_create_collection(name="documents")
 for entry in embeddings_data:
     if "id" in entry and "embedding" in entry and "metadata" in entry:
         collection.add(
-            ids=[str(entry["id"])],  # ID musí být string
+            ids=[str(entry["id"])],
             embeddings=[entry["embedding"]],
-            metadatas=[entry["metadata"]]  # Metadata obsahují "source"
+            metadatas=[entry["metadata"]]
         )
 print("✅ Embeddingy úspěšně uloženy do ChromaDB!")
 
@@ -38,6 +48,10 @@ def get_query_embedding(query: str):
         if "metadata" in entry and entry["metadata"].get("source") == query:
             return entry["embedding"]
     return None
+
+@app.options("/chat")
+def options_chat():
+    return {}
 
 @app.post("/chat")
 def chat(request: dict):
@@ -52,7 +66,7 @@ def chat(request: dict):
     results = collection.query(query_embeddings=[query_embedding], n_results=1)
     
     if results["ids"]:
-        return {"response": results["metadatas"][0]["source"]}  # Oprava chyby
+        return {"response": results["metadatas"][0]["source"]}
     else:
         return {"response": "Na tuto otázku nemám odpověď."}
 
